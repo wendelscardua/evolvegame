@@ -108,7 +108,7 @@ public class EvolveGame extends Game.Default {
             generationStep();
         }
         for(Ball ball : balls) {
-            if (random() < 0.001) {
+            if (random() < 0.002) {
                 ball.randomize();
                 ball.updatePosition();
             }
