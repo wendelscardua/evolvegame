@@ -14,13 +14,13 @@ import static playn.core.PlayN.*;
 public class EvolveGame extends Game.Default {
 
     private ArrayList<Robot> robots = null;
-    private static final int numRobots = 20, numBalls = 20;
+    private static final int numRobots = 20, numBalls = 10;
     private int numWeights = 0;
     private GeneticAlgorithm ga;
     private int ticks = 0;
     private int generation = 0;
     private int ticksPerGeneration = 5000;
-    private int fastForwardSteps = 10000;
+    private int fastForwardSteps = 50000;
     private ArrayList<Ball> balls;
 
     private boolean fastForward = false;
@@ -61,9 +61,9 @@ public class EvolveGame extends Game.Default {
         }
 
         Genes.getInstance()
-                .addGene("red", BinaryValue.class)
-                .addGene("green", BinaryValue.class)
-                .addGene("blue", BinaryValue.class)
+                .addGene("red", FloatValue.class)
+                .addGene("green", FloatValue.class)
+                .addGene("blue", FloatValue.class)
         ;
 
         this.numWeights = this.robots.get(0).brain.getNumWeights();
@@ -107,16 +107,22 @@ public class EvolveGame extends Game.Default {
             this.ticks = 0;
             generationStep();
         }
+        for(Ball ball : balls) {
+            if (random() < 0.001) {
+                ball.randomize();
+                ball.updatePosition();
+            }
+        }
         for(Robot robot : this.robots) {
             int IN_LOOK_VECTOR_X = 0, IN_LOOK_VECTOR_Y = 1, IN_NEAREST_VECTOR_X = 2, IN_NEAREST_VECTOR_Y = 3;
-            int IN_NEAREST_R = 4, IN_NEAREST_G = 5, IN_NEAREST_B = 6;
-            int OUT_LEFT_TRACK = 0, OUT_RIGHT_TRACK = 1, OUT_ACTIVATE_FIRE = 2;
+            int IN_NEAREST_R = 4, IN_NEAREST_G = 5, IN_NEAREST_B = 6, IN_OWN_COLOR_R = 7, IN_OWN_COLOR_G = 8, IN_OWN_COLOR_B = 9;
+            int OUT_LEFT_TRACK = 0, OUT_RIGHT_TRACK = 1;
             ArrayList<Double> input = new ArrayList<Double>();
             for(int i = 0; i < robot.numInputs; i++) {
                 input.add(0.0);
             }
-            input.set(IN_LOOK_VECTOR_X, -Math.sin(robot.angle));
-            input.set(IN_LOOK_VECTOR_Y,  Math.cos(robot.angle));
+            input.set(IN_LOOK_VECTOR_X,  Math.cos(robot.angle));
+            input.set(IN_LOOK_VECTOR_Y, -Math.sin(robot.angle));
             Ball nearest = getNearestBall(robot);
             if (nearest != null) {
                 double dx = nearest.x - robot.x;
@@ -126,9 +132,9 @@ public class EvolveGame extends Game.Default {
                 dy /= d;
                 input.set(IN_NEAREST_VECTOR_X, dx);
                 input.set(IN_NEAREST_VECTOR_Y, dy);
-                input.set(IN_NEAREST_R, (double) nearest.red);
-                input.set(IN_NEAREST_G, (double) nearest.green);
-                input.set(IN_NEAREST_B, (double) nearest.blue);
+                input.set(IN_NEAREST_R, nearest.color == Color.RED ? 1.0 : 0.0);
+                input.set(IN_NEAREST_G, nearest.color == Color.GREEN ? 1.0 : 0.0);
+                input.set(IN_NEAREST_B, nearest.color == Color.BLUE ? 1.0 : 0.0);
             } else {
                 input.set(IN_NEAREST_VECTOR_X, 0.0);
                 input.set(IN_NEAREST_VECTOR_Y, 0.0);
@@ -136,24 +142,26 @@ public class EvolveGame extends Game.Default {
                 input.set(IN_NEAREST_G, 0.0);
                 input.set(IN_NEAREST_B, 0.0);
             }
+            input.set(IN_OWN_COLOR_R, robot.color == Color.RED ? 1.0 : 0.0);
+            input.set(IN_OWN_COLOR_G, robot.color == Color.GREEN ? 1.0 : 0.0);
+            input.set(IN_OWN_COLOR_B, robot.color == Color.BLUE ? 1.0 : 0.0);
             ArrayList<Double> output = robot.brain.update(input);
 
             double leftTrack = output.get(OUT_LEFT_TRACK);
             double rightTrack = output.get(OUT_RIGHT_TRACK);
+
             robot.applyForces(leftTrack, rightTrack);
             robot.updatePosition();
             for(Ball ball : this.balls) {
                 if (Math.abs(ball.x - robot.x) < 16.0 &&
                     Math.abs(ball.y - robot.y) < 16.0) {
-                    if (ball.red == robot.red && ball.green == robot.green && ball.blue == robot.blue) {
-                        robot.fitness += 1.0;
-                        ball.randomize();
-                        ball.updatePosition();
-                    } else if (random() < 0.1) {
-                        robot.fitness += 1.0;
-                        ball.randomize();
-                        ball.updatePosition();
+                    if (ball.color != robot.color) {
+                        robot.fitness += 100.0;
+                    } else {
+                        robot.fitness *= 0.75;
                     }
+                    ball.randomize();
+                    ball.updatePosition();
                 }
             }
         }
@@ -167,8 +175,13 @@ public class EvolveGame extends Game.Default {
             double dx = ball.x - robot.x;
             double dy = ball.y - robot.y;
 
-            double ballAngle = Math.atan2(dy, dx);
-            if (Math.abs(ballAngle - robot.angle) < 15 * Math.PI / 180) {
+            double ballAngle = Math.atan2(-dy, dx);
+            double delta = ballAngle - robot.angle;
+
+            if (Math.abs(delta) < 15 * Math.PI / 180
+                || Math.abs(delta - 2 * Math.PI) < 15 * Math.PI / 180.0
+                || Math.abs(delta + 2 * Math.PI) < 15 * Math.PI / 180.0
+               ) {
                 double squareDistance = dx*dx + dy*dy;
                 if (squareDistance < bestSquareDistance) {
                     bestSquareDistance = squareDistance;
@@ -184,7 +197,6 @@ public class EvolveGame extends Game.Default {
         for(int i = 0; i < numRobots; i++) {
             this.ga.getChromosomes().get(i).setFitness( this.robots.get(i).fitness );
         }
-        this.ga.sortChromosomes();
         System.err.println("Generation: " + this.generation);
         double best = Double.NEGATIVE_INFINITY;
         double average = 0;
@@ -207,10 +219,10 @@ public class EvolveGame extends Game.Default {
     }
 
     public static class Robot {
-        public final int numInputs = 7;
+        public final int numInputs = 10;
         public final int numOutputs = 2;
         private final int numHiddenLayers = 2;
-        private final int numNeuronsPerHiddenLayer = 5;
+        private final int numNeuronsPerHiddenLayer = 6;
         private int numWeights = 0;
 
         public double x, y, angle;
@@ -218,13 +230,11 @@ public class EvolveGame extends Game.Default {
 
         public double fitness = 0.0;
 
-        public int red;
-        public int green;
-        public int blue;
+        public Color color;
 
         public NeuralNetwork brain;
         private ImageLayer imageLayer;
-        private double maxTurnRate = 0.3;
+        private double maxTurnRate = 0.30;
 
         public Robot() {
             this.x = random() * graphics().width();
@@ -243,10 +253,16 @@ public class EvolveGame extends Game.Default {
             }
             this.brain.putWeights(weights);
 
-            this.red = chromosome.getGeneValue("red").getBinaryValue();
-            this.green = chromosome.getGeneValue("green").getBinaryValue();
-            this.blue = chromosome.getGeneValue("blue").getBinaryValue();
-
+            double redness = chromosome.getGeneValue("red").getFloatValue();
+            double greenness = chromosome.getGeneValue("green").getFloatValue();
+            double blueness = chromosome.getGeneValue("blue").getFloatValue();
+            if (redness > greenness && redness > blueness) {
+                this.color = Color.RED;
+            } else if (greenness > blueness) {
+                this.color = Color.GREEN;
+            } else {
+                this.color = Color.BLUE;
+            }
             this.fitness = 0.0;
         }
 
@@ -258,15 +274,15 @@ public class EvolveGame extends Game.Default {
 
         public int getTint() {
             int tint = 0xff000000;
-            if (red > 0)   tint |= 0x00ff0000;
-            if (green > 0) tint |= 0x0000ff00;
-            if (blue > 0)  tint |= 0x000000ff;
+            if (this.color == Color.RED)   tint |= 0x00ff0000;
+            if (this.color == Color.GREEN) tint |= 0x0000ff00;
+            if (this.color == Color.BLUE)  tint |= 0x000000ff;
             return tint;
         }
 
         private void updatePosition() {
             this.imageLayer.setTranslation((float) this.x, (float) this.y);
-            this.imageLayer.setRotation((float) this.angle);
+            this.imageLayer.setRotation((float) -this.angle);
             this.imageLayer.setTint(this.getTint());
         }
 
@@ -277,16 +293,13 @@ public class EvolveGame extends Game.Default {
 
             this.angle += rotForce;
 
-            double alpha = 1.0;
-            if (leftTrack < 0.5 || rightTrack < 0.5) alpha = 0.0;
+            double x2 = this.x +  Math.cos(this.angle) * (this.speed);
+            double y2 = this.y + -Math.sin(this.angle) * (this.speed);
 
-            double x2 = this.x + -Math.sin(this.angle) * (this.speed * alpha);
-            double y2 = this.y +  Math.cos(this.angle) * (this.speed * alpha);
-
-            if (x2 < 0) { x2 = 0.0; this.angle = 2 * Math.PI - this.angle; }
-            if (x2 > graphics().width()) { x2 = graphics().width(); this.angle = 2 * Math.PI - this.angle; }
-            if (y2 < 0) { y2 = 0.0; this.angle = Math.PI - this.angle; }
-            if (y2 > graphics().height()) { y2 = graphics().height(); this.angle = Math.PI - this.angle; }
+            if (x2 < 0) { x2 = 0.0; this.angle = Math.PI - this.angle; }
+            if (x2 > graphics().width()) { x2 = graphics().width(); this.angle = Math.PI - this.angle; }
+            if (y2 < 0) { y2 = 0.0; this.angle = 2 * Math.PI - this.angle; }
+            if (y2 > graphics().height()) { y2 = graphics().height(); this.angle = 2 * Math.PI - this.angle; }
 
             this.x = x2;
             this.y = y2;
@@ -298,9 +311,7 @@ public class EvolveGame extends Game.Default {
     public class Ball {
         public double x;
         public double y;
-        public int red;
-        public int green;
-        public int blue;
+        public Color color;
         private ImageLayer imageLayer;
 
         public Ball() {
@@ -310,17 +321,21 @@ public class EvolveGame extends Game.Default {
         public void randomize() {
             this.x = random() * graphics().width();
             this.y = random() * graphics().height();
-            this.red = random() > 0.5 ? 1 : 0;
-            this.green = random() > 0.5 ? 1 : 0;
-            this.blue = random() > 0.5 ? 1 : 0;
-            if (this.red == 0 && this.green == 0 && this.blue == 0) randomize();
+            double colorFactor = random();
+            if (colorFactor < 1/3.0) {
+                color = Color.RED;
+            } else if (colorFactor < 2/3.0) {
+                color = Color.GREEN;
+            } else {
+                color = Color.BLUE;
+            }
         }
 
         public int getTint() {
             int tint = 0xff000000;
-            if (red > 0)   tint |= 0x00ff0000;
-            if (green > 0) tint |= 0x0000ff00;
-            if (blue > 0)  tint |= 0x000000ff;
+            if (this.color == Color.RED)   tint |= 0x00ff0000;
+            if (this.color == Color.GREEN) tint |= 0x0000ff00;
+            if (this.color == Color.BLUE)  tint |= 0x000000ff;
             return tint;
         }
 
@@ -334,5 +349,9 @@ public class EvolveGame extends Game.Default {
             this.imageLayer.setTranslation((float) this.x, (float) this.y);
             this.imageLayer.setTint(this.getTint());
         }
+    }
+
+    private enum Color {
+        RED, GREEN, BLUE
     }
 }
