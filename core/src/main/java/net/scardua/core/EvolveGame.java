@@ -18,7 +18,7 @@ public class EvolveGame extends Game.Default {
     private int ticks = 0;
     private int generation = 0;
     private final int ticksPerGeneration = 2000;
-    private final int fastForwardSteps = 50000;
+    private final int fastForwardSteps = 2000;
     private ArrayList<Ball> balls;
 
     private boolean fastForward = false;
@@ -201,6 +201,10 @@ public class EvolveGame extends Game.Default {
                 }
             }
         }
+        for(Ball ball : balls) {
+            ball.applyForces();
+            ball.updatePosition();
+        }
     }
 
     private Ball getNearestBall(Robot robot) {
@@ -261,7 +265,7 @@ public class EvolveGame extends Game.Default {
     public static class Robot {
         public final int numInputs = 10;
         public final int numOutputs = 2;
-        private final int numHiddenLayers = 2;
+        private final int numHiddenLayers = 3;
         private final int numNeuronsPerHiddenLayer = 6;
         private int numWeights = 0;
 
@@ -274,7 +278,7 @@ public class EvolveGame extends Game.Default {
 
         public NeuralNetwork brain;
         private ImageLayer imageLayer;
-        private double maxTurnRate = 0.30;
+        private double maxTurnRate = 1.00;
 
         public Robot() {
             this.x = random() * graphics().width();
@@ -351,6 +355,8 @@ public class EvolveGame extends Game.Default {
     public class Ball {
         public double x;
         public double y;
+        public double speed;
+        public double angle;
         public Color color;
         private ImageLayer imageLayer;
 
@@ -361,6 +367,8 @@ public class EvolveGame extends Game.Default {
         public void randomize() {
             this.x = random() * graphics().width();
             this.y = random() * graphics().height();
+            this.speed = 5.0 * random();
+            this.angle = random() * 2 * Math.PI;
             double colorFactor = random();
             if (colorFactor < 1/3.0) {
                 color = Color.RED;
@@ -383,6 +391,21 @@ public class EvolveGame extends Game.Default {
             this.imageLayer = imageLayer;
             this.imageLayer.setOrigin(16, 16);
             updatePosition();
+        }
+
+        public void applyForces() {
+            double x2 = this.x +  Math.cos(this.angle) * (this.speed);
+            double y2 = this.y + -Math.sin(this.angle) * (this.speed);
+
+            if (x2 < 0) { x2 = 0.0; this.angle = Math.PI - this.angle; }
+            if (x2 > graphics().width()) { x2 = graphics().width(); this.angle = Math.PI - this.angle; }
+            if (y2 < 0) { y2 = 0.0; this.angle = 2 * Math.PI - this.angle; }
+            if (y2 > graphics().height()) { y2 = graphics().height(); this.angle = 2 * Math.PI - this.angle; }
+
+            this.x = x2;
+            this.y = y2;
+            while (this.angle < 0) this.angle += 2 * Math.PI;
+            while (this.angle >= 2 * Math.PI) this.angle -= 2 * Math.PI;
         }
 
         private void updatePosition() {
