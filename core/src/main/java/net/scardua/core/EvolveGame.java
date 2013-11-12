@@ -2,10 +2,7 @@ package net.scardua.core;
 
 import net.scardua.ga.*;
 import net.scardua.nn.NeuralNetwork;
-import playn.core.Game;
-import playn.core.Image;
-import playn.core.ImageLayer;
-import playn.core.Keyboard;
+import playn.core.*;
 
 import java.util.ArrayList;
 
@@ -14,16 +11,19 @@ import static playn.core.PlayN.*;
 public class EvolveGame extends Game.Default {
 
     private ArrayList<Robot> robots = null;
-    private static final int numRobots = 20, numBalls = 10;
+    private int numRobots = 20;
+    private int numBalls = 10;
     private int numWeights = 0;
     private GeneticAlgorithm ga;
     private int ticks = 0;
     private int generation = 0;
-    private int ticksPerGeneration = 2000;
-    private int fastForwardSteps = 50000;
+    private final int ticksPerGeneration = 2000;
+    private final int fastForwardSteps = 50000;
     private ArrayList<Ball> balls;
 
     private boolean fastForward = false;
+    private Image ballImage;
+    private Image botImage;
 
     public EvolveGame() {
         super(33); // call update every 33ms (30 times per second)
@@ -38,7 +38,7 @@ public class EvolveGame extends Game.Default {
 
         this.balls = new ArrayList<Ball>();
 
-        Image ballImage = assets().getImage("images/ball.png");
+        this.ballImage = assets().getImage("images/ball.png");
 
         for(int i = 0; i < numBalls; i++) {
             Ball ball = new Ball();
@@ -49,7 +49,7 @@ public class EvolveGame extends Game.Default {
         }
 
 
-        Image botImage = assets().getImage("images/robot.png");
+        botImage = assets().getImage("images/robot.png");
 
         this.robots = new ArrayList<Robot>();
         for(int i = 0; i < numRobots; i++) {
@@ -76,6 +76,41 @@ public class EvolveGame extends Game.Default {
         for(int i = 0; i < numRobots; i++) {
             this.robots.get(i).loadChromosome(this.ga.getChromosomes().get(i));
         }
+
+        pointer().setListener(new Pointer.Listener() {
+            @Override
+            public void onPointerStart(Pointer.Event event) {
+            }
+
+            @Override
+            public void onPointerEnd(Pointer.Event event) {
+
+                for(Ball ball : balls) {
+                    if (Math.abs(ball.x - event.x()) < 16.0 && Math.abs(ball.y - event.y()) < 16.0) {
+                        graphics().rootLayer().remove(ball.imageLayer);
+                        balls.remove(ball);
+                        numBalls--;
+                        return;
+                    }
+                }
+                Ball spawn = new Ball();
+                spawn.x = event.x();
+                spawn.y = event.y();
+                ImageLayer ballLayer = graphics().createImageLayer(ballImage);
+                graphics().rootLayer().add(ballLayer);
+                spawn.addGraphics(ballLayer);
+                balls.add(spawn);
+                numBalls++;
+            }
+
+            @Override
+            public void onPointerDrag(Pointer.Event event) {
+            }
+
+            @Override
+            public void onPointerCancel(Pointer.Event event) {
+            }
+        });
 
         keyboard().setListener(new Keyboard.Adapter() {
             public void onKeyUp(Keyboard.Event event) {
@@ -207,7 +242,7 @@ public class EvolveGame extends Game.Default {
                 best = chromosome.getFitness();
             }
         }
-        log().debug("Average fitness: " + average/numRobots + ", best fitness: " + best);
+        log().debug("Average fitness: " + average / numRobots + ", best fitness: " + best);
         this.ga.stepOver();
         for(int i = 0; i < numRobots; i++) {
             this.robots.get(i).loadChromosome(this.ga.getChromosomes().get(i));
