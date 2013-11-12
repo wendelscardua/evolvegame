@@ -19,7 +19,7 @@ public class EvolveGame extends Game.Default {
     private GeneticAlgorithm ga;
     private int ticks = 0;
     private int generation = 0;
-    private int ticksPerGeneration = 5000;
+    private int ticksPerGeneration = 2000;
     private int fastForwardSteps = 50000;
     private ArrayList<Ball> balls;
 
@@ -80,6 +80,7 @@ public class EvolveGame extends Game.Default {
         keyboard().setListener(new Keyboard.Adapter() {
             public void onKeyUp(Keyboard.Event event) {
                 switch (event.key()) {
+                    case MENU:
                     case F:
                         fastForward = !fastForward;
                         break;
@@ -197,7 +198,7 @@ public class EvolveGame extends Game.Default {
         for(int i = 0; i < numRobots; i++) {
             this.ga.getChromosomes().get(i).setFitness( this.robots.get(i).fitness );
         }
-        System.err.println("Generation: " + this.generation);
+        log().debug("Generation: " + this.generation);
         double best = Double.NEGATIVE_INFINITY;
         double average = 0;
         for(Chromosome chromosome: this.ga.getChromosomes()) {
@@ -206,10 +207,14 @@ public class EvolveGame extends Game.Default {
                 best = chromosome.getFitness();
             }
         }
-        System.err.println("Average fitness: " + average/numRobots + ", best fitness: " + best);
+        log().debug("Average fitness: " + average/numRobots + ", best fitness: " + best);
         this.ga.stepOver();
         for(int i = 0; i < numRobots; i++) {
             this.robots.get(i).loadChromosome(this.ga.getChromosomes().get(i));
+        }
+        for(Ball ball : this.balls) {
+            ball.randomize();
+            ball.updatePosition();
         }
     }
 
