@@ -11,7 +11,7 @@ import static playn.core.PlayN.random;
 * Date: 11/12/13
 * Time: 21:01
 */
-public class Ball {
+public class Ball implements Position {
     public double x;
     public double y;
     public double speed;
@@ -20,12 +20,18 @@ public class Ball {
     public ImageLayer imageLayer;
 
     public Ball() {
+        this.x = random() * graphics().width();
+        this.y = random() * graphics().height();
         randomize();
     }
 
     public void randomize() {
-        this.x = random() * graphics().width();
-        this.y = random() * graphics().height();
+        double dx = (random() - .5) * .05 * graphics().width();
+        double dy = (random() - .5) * .05 * graphics().height();
+        if (this.x + dx <= 0 || this.x + dx > graphics().width()) dx = -dx;
+        if (this.y + dy <= 0 || this.y + dy > graphics().height()) dy = -dy;
+        this.x += dx;
+        this.y += dy;
         this.speed = 5.0 * random();
         this.angle = random() * 2 * Math.PI;
         double colorFactor = random();
@@ -70,5 +76,29 @@ public class Ball {
     public void updatePosition() {
         this.imageLayer.setTranslation((float) this.x, (float) this.y);
         this.imageLayer.setTint(this.getTint());
+    }
+
+    @Override
+    public float x() {
+        return (float) x;
+    }
+
+    @Override
+    public float y() {
+        return (float) y;
+    }
+
+    public void flip() {
+        switch (this.color) {
+            case RED:
+                this.color = Color.GREEN;
+                break;
+            case GREEN:
+                this.color = Color.BLUE;
+                break;
+            case BLUE:
+                this.color = Color.RED;
+                break;
+        }
     }
 }

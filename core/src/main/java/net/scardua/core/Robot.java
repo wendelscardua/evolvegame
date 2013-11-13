@@ -16,29 +16,28 @@ import static playn.core.PlayN.random;
 * Date: 11/12/13
 * Time: 21:01
 */
-public class Robot {
-    public final int numInputs = 10;
-    public final int numOutputs = 2;
+public class Robot implements Position {
+    public final int numInputs = 16;
+    public final int numOutputs = 4;
     private final int numHiddenLayers = 3;
-    private final int numNeuronsPerHiddenLayer = 6;
+    private final int numNeuronsPerHiddenLayer = 8;
     private int numWeights = 0;
 
     public double x, y, angle;
     public double speed = 5.0;
 
     public double fitness = 0.0;
-
+    public final int maxPower = 500;
+    public int power = maxPower;
+    public int deltaPower = 0;
+    public int timeOfDeath = -1;
     public Color color;
 
     public NeuralNetwork brain;
     private ImageLayer imageLayer;
-    private double maxTurnRate = 1.00;
+    private double maxTurnRate = .40;
 
     public Robot() {
-        this.x = random() * graphics().width();
-        this.y = random() * graphics().height();
-        this.angle = random() * 2 * Math.PI;
-
         this.brain = new NeuralNetwork(numInputs, numOutputs, numHiddenLayers, numNeuronsPerHiddenLayer);
         this.numWeights = brain.getNumWeights();
     }
@@ -62,6 +61,8 @@ public class Robot {
             this.color = Color.BLUE;
         }
         this.fitness = 0.0;
+        this.power = this.maxPower;
+        randomize();
     }
 
     public void addGraphics(ImageLayer imageLayer) {
@@ -72,10 +73,17 @@ public class Robot {
 
     public int getTint() {
         int tint = 0xff000000;
-        if (this.color == Color.RED)   tint |= 0x00ff0000;
-        if (this.color == Color.GREEN) tint |= 0x0000ff00;
-        if (this.color == Color.BLUE)  tint |= 0x000000ff;
+        int value = (int) (0x30 + (0xff - 0x30) * this.power / (float) this.maxPower);
+        if (this.color == Color.RED)   tint |= (value << 16);
+        if (this.color == Color.GREEN) tint |= (value << 8);
+        if (this.color == Color.BLUE)  tint |= value;
         return tint;
+    }
+
+    public void randomize() {
+        this.x = random() * graphics().width();
+        this.y = random() * graphics().height();
+        this.angle = random() * 2 * Math.PI;
     }
 
     public void updatePosition() {
@@ -86,13 +94,16 @@ public class Robot {
 
     public void applyForces(double leftTrack, double rightTrack) {
         double rotForce = leftTrack - rightTrack;
-        if (rotForce > this.maxTurnRate)  rotForce = this.maxTurnRate;
-        if (rotForce < -this.maxTurnRate) rotForce = -this.maxTurnRate;
+        if (rotForce >= this.maxTurnRate)  rotForce = this.maxTurnRate;
+        else if (rotForce <= -this.maxTurnRate) rotForce = -this.maxTurnRate;
+        else this.power--;
 
         this.angle += rotForce;
 
-        double x2 = this.x +  Math.cos(this.angle) * (this.speed);
-        double y2 = this.y + -Math.sin(this.angle) * (this.speed);
+        double applySpeed = this.speed * (1 - Math.abs(rotForce)/this.maxTurnRate);
+
+        double x2 = this.x +  Math.cos(this.angle) * (applySpeed);
+        double y2 = this.y + -Math.sin(this.angle) * (applySpeed);
 
         if (x2 < 0) { x2 = 0.0; this.angle = Math.PI - this.angle; }
         if (x2 > graphics().width()) { x2 = graphics().width(); this.angle = Math.PI - this.angle; }
@@ -103,5 +114,15 @@ public class Robot {
         this.y = y2;
         while (this.angle < 0) this.angle += 2 * Math.PI;
         while (this.angle >= 2 * Math.PI) this.angle -= 2 * Math.PI;
+    }
+
+    @Override
+    public float x() {
+        return (float) x;
+    }
+
+    @Override
+    public float y() {
+        return (float) y;
     }
 }
