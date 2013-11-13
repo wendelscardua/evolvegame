@@ -26,8 +26,8 @@ public class Ball implements Position {
     }
 
     public void randomize() {
-        double dx = (random() - .5) * .05 * graphics().width();
-        double dy = (random() - .5) * .05 * graphics().height();
+        double dx = (random()+.4) * .05 * graphics().width() * (random() > .5 ? 1 : -1);
+        double dy = (random()+.4) * .05 * graphics().height() * (random() > .5 ? 1 : -1);
         if (this.x + dx <= 0 || this.x + dx > graphics().width()) dx = -dx;
         if (this.y + dy <= 0 || this.y + dy > graphics().height()) dy = -dy;
         this.x += dx;
