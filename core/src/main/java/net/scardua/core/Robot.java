@@ -94,9 +94,9 @@ public class Robot implements Position {
 
     public void applyForces(double leftTrack, double rightTrack) {
         double rotForce = leftTrack - rightTrack;
-        if (rotForce >= this.maxTurnRate)  rotForce = this.maxTurnRate;
-        else if (rotForce <= -this.maxTurnRate) rotForce = -this.maxTurnRate;
-        else this.power--;
+        if (rotForce >= this.maxTurnRate) { rotForce = this.maxTurnRate; this.power -= 1; }
+        else if (rotForce <= -this.maxTurnRate) { rotForce = -this.maxTurnRate; this.power -= 1; }
+        else { this.power-=2; }
 
         this.angle += rotForce;
 

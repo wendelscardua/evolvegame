@@ -32,7 +32,7 @@ public class Ball implements Position {
         if (this.y + dy <= 0 || this.y + dy > graphics().height()) dy = -dy;
         this.x += dx;
         this.y += dy;
-        this.speed = 5.0 * random();
+        this.speed = 2.0 * random();
         this.angle = random() * 2 * Math.PI;
         double colorFactor = random();
         if (colorFactor < 1/3.0) {

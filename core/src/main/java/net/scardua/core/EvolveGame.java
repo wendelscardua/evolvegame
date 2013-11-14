@@ -306,7 +306,7 @@ public class EvolveGame extends Game.Default {
             return;
         }
         for(Ball ball : balls) {
-            //ball.applyForces();
+            ball.applyForces();
             ball.updatePosition();
         }
     }
