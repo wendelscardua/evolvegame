@@ -18,13 +18,13 @@ import static playn.core.PlayN.random;
 */
 public class Robot implements Position {
     public final int numInputs = 16;
-    public final int numOutputs = 4;
+    public final int numOutputs = 5;
     private final int numHiddenLayers = 3;
     private final int numNeuronsPerHiddenLayer = 8;
     private int numWeights = 0;
 
     public double x, y, angle;
-    public double speed = 5.0;
+    public double speed = 3.0;
 
     public double fitness = 0.0;
     public final int maxPower = 500;
@@ -35,7 +35,8 @@ public class Robot implements Position {
 
     public NeuralNetwork brain;
     private ImageLayer imageLayer;
-    private double maxTurnRate = .40;
+    private double maxTurnRate = .3;
+    private double fov;
 
     public Robot() {
         this.brain = new NeuralNetwork(numInputs, numOutputs, numHiddenLayers, numNeuronsPerHiddenLayer);
@@ -53,6 +54,8 @@ public class Robot implements Position {
         double redness = chromosome.getGeneValue("red").getFloatValue();
         double greenness = chromosome.getGeneValue("green").getFloatValue();
         double blueness = chromosome.getGeneValue("blue").getFloatValue();
+        double fov = chromosome.getGeneValue("fov").getFloatValue();
+        this.fov = fov;
         if (redness > greenness && redness > blueness) {
             this.color = Color.RED;
         } else if (greenness > blueness) {
@@ -80,6 +83,10 @@ public class Robot implements Position {
         return tint;
     }
 
+    public double getFOV() {
+        return this.fov;
+    }
+
     public void randomize() {
         this.x = random() * graphics().width();
         this.y = random() * graphics().height();
@@ -92,22 +99,23 @@ public class Robot implements Position {
         this.imageLayer.setTint(this.getTint());
     }
 
-    public void applyForces(double leftTrack, double rightTrack) {
+    public void applyForces(double leftTrack, double rightTrack, double speed) {
         double rotForce = leftTrack - rightTrack;
-        if (rotForce >= this.maxTurnRate) { rotForce = this.maxTurnRate; this.power -= 1; }
-        else if (rotForce <= -this.maxTurnRate) { rotForce = -this.maxTurnRate; this.power -= 1; }
-        else { this.power-=2; }
+        if (rotForce >= this.maxTurnRate) { rotForce = this.maxTurnRate; }
+        else if (rotForce <= -this.maxTurnRate) { rotForce = -this.maxTurnRate; }
+        this.deltaPower -= 1;
+
 
         this.angle += rotForce;
 
-        double applySpeed = this.speed * (1 - Math.abs(rotForce)/this.maxTurnRate);
+        double applySpeed = this.speed * 2 * (speed - 0.5); // speed = 1 => 1 (forward). speed = 0 => -1 (rewind)
 
         double x2 = this.x +  Math.cos(this.angle) * (applySpeed);
         double y2 = this.y + -Math.sin(this.angle) * (applySpeed);
 
         if (x2 < 0) { x2 = 0.0; this.angle = Math.PI - this.angle; }
         if (x2 > graphics().width()) { x2 = graphics().width(); this.angle = Math.PI - this.angle; }
-        if (y2 < 0) { y2 = 0.0; this.angle = 2 * Math.PI - this.angle; }
+        if (y2 < 0) { y2 = 0.0; this.angle = 2 * Math.PI - this.angle; this.deltaPower -= 10; }
         if (y2 > graphics().height()) { y2 = graphics().height(); this.angle = 2 * Math.PI - this.angle; }
 
         this.x = x2;

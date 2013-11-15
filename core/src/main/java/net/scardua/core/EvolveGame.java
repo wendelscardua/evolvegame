@@ -4,14 +4,15 @@ import net.scardua.ga.*;
 import playn.core.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import static playn.core.PlayN.*;
 
 public class EvolveGame extends Game.Default {
 
     private ArrayList<Robot> robots = null;
-    private int numRobots = 32;
-    private int numBalls = 16;
+    private int numRobots = 50;
+    private int numBalls = 50;
     private GeneticAlgorithm ga;
     private int ticks = 0;
     private int generation = 0;
@@ -66,6 +67,7 @@ public class EvolveGame extends Game.Default {
                 .addGene("red", FloatValue.class)
                 .addGene("green", FloatValue.class)
                 .addGene("blue", FloatValue.class)
+                .addGene("fov", FloatValue.class)
         ;
 
         int numWeights = this.robots.get(0).brain.getNumWeights();
@@ -118,6 +120,53 @@ public class EvolveGame extends Game.Default {
             public void onKeyUp(Keyboard.Event event) {
                 switch (event.key()) {
                     case MENU:
+                    case S:
+                        ArrayList<Chromosome> chromosomes = ga.getChromosomes();
+                        Json.Array array = json().createArray();
+                        for(Chromosome chromosome: chromosomes) {
+                            Json.Object object = json().createObject();
+                            for(Genes.Gene gene: Genes.getInstance().values()) {
+                                Json.Object geneObject = json().createObject();
+                                Value value = chromosome.getGeneValue(gene);
+                                if (value instanceof BinaryValue) {
+                                    geneObject.put("type", "binary");
+                                    geneObject.put("value", String.valueOf(value.getBinaryValue()));
+                                } else {
+                                    geneObject.put("type", "float");
+                                    geneObject.put("value", String.valueOf(value.getFloatValue()));
+                                }
+                                object.put(gene.name, geneObject);
+                            }
+                            array.add(object);
+                        }
+                        Json.Writer jsonWriter = json().newWriter();
+                        String dataString = jsonWriter.array(array).write();
+                        storage().setItem("chromosomes.data", dataString);
+                        storage().setItem("generation", String.valueOf(generation));
+                        log().debug("File saved");
+                        break;
+                    case L:
+                        String inputString = storage().getItem("chromosomes.data");
+                        Json.Array inputArray = json().parseArray(inputString);
+                        for(int i = 0; i < inputArray.length(); i++) {
+                            Json.Object object = inputArray.getObject(i);
+                            Chromosome chromosome = ga.getChromosomes().get(i);
+                            for(Genes.Gene gene: Genes.getInstance().values()) {
+                                Json.Object geneObject = object.getObject(gene.name);
+                                if (geneObject.getString("type").equals("binary")) {
+                                    Value geneValue = new BinaryValue(Integer.valueOf(geneObject.getString("value")));
+                                    chromosome.setGeneValue(gene, geneValue);
+                                } else if (geneObject.getString("type").equals("float")) {
+                                    Value geneValue = new FloatValue(Double.valueOf(geneObject.getString("value")));
+                                    chromosome.setGeneValue(gene, geneValue);
+                                }
+                            }
+                            robots.get(i).loadChromosome(chromosome);
+                        }
+                        ticks = 0;
+                        generation = Integer.valueOf(storage().getItem("generation"));
+                        log().debug("File loaded");
+                        break;
                     case F:
                         fastForward = !fastForward;
                         break;
@@ -147,12 +196,12 @@ public class EvolveGame extends Game.Default {
             generationStep();
             this.ticks = 0;
         }
-        for(Ball ball : balls) {
-            if (random() < 0.002) {
-                ball.flip();
-                ball.updatePosition();
-            }
-        }
+//        for(Ball ball : balls) {
+//            if (random() < 0.002) {
+//                ball.flip();
+//                ball.updatePosition();
+//            }
+//        }
         for(Robot robot : this.robots) {
             if (robot.power <= 0) {
                 robot.updatePosition();
@@ -165,7 +214,7 @@ public class EvolveGame extends Game.Default {
             int IN_ENEMY_VECTOR_X = 10, IN_ENEMY_VECTOR_Y = 11;
             int IN_ENEMY_R = 12, IN_ENEMY_G = 13, IN_ENEMY_B = 14;
             int IN_CURRENT_POWER = 15;
-            int OUT_LEFT_TRACK = 0, OUT_RIGHT_TRACK = 1, OUT_SHOOTING_IMPETUS = 2, OUT_SHOOTING_RESTRAINT = 3;
+            int OUT_LEFT_TRACK = 0, OUT_RIGHT_TRACK = 1, OUT_SPEED = 2, OUT_SHOOTING_IMPETUS = 3, OUT_SHOOTING_RESTRAINT = 4;
             ArrayList<Double> input = new ArrayList<Double>();
             for(int i = 0; i < robot.numInputs; i++) {
                 input.add(0.0);
@@ -220,39 +269,41 @@ public class EvolveGame extends Game.Default {
 
             double leftTrack = output.get(OUT_LEFT_TRACK);
             double rightTrack = output.get(OUT_RIGHT_TRACK);
+            double speed = output.get(OUT_SPEED);
             double shootingImpetus = output.get(OUT_SHOOTING_IMPETUS);
             double shootingRestraint = output.get(OUT_SHOOTING_RESTRAINT);
 
-            robot.applyForces(leftTrack, rightTrack);
-            robot.updatePosition();
             robot.deltaPower = 0;
+            robot.applyForces(leftTrack, rightTrack, speed);
+            robot.updatePosition();
             for(Ball ball : this.balls) {
                 if (Math.abs(ball.x - robot.x) < 16.0 &&
                     Math.abs(ball.y - robot.y) < 16.0) {
 
-                    robot.deltaPower += 200;
-                    robot.fitness += 10.0;
+                    robot.deltaPower += 100;
 
                     if (ball.color != robot.color) {
                         robot.color = ball.color;
+                        robot.deltaPower += 50;
                     }
 
-                    ball.randomize();
+                    ball.x = -1000;
+                    ball.y = -1000;
                     ball.updatePosition();
                 }
             }
             if (shootingImpetus > shootingRestraint && robot.power >= 10) {
-                robot.deltaPower -= 10;
-
+                double laserPower = shootingImpetus - shootingRestraint + .1;
+                robot.deltaPower -= 50 * laserPower;
                 float x0 = (float) robot.x;
                 float y0 = (float) robot.y;
-                float laserRange = graphics().width() + graphics().height();
+                float laserRange = (float) (Math.sqrt(graphics().width() * graphics().width() + graphics().height() * graphics().height()) * laserPower);
                 double angle = (float) robot.angle;
                 float x1 = (float) (x0 + laserRange *  Math.cos(angle));
                 float y1 = (float) (y0 + laserRange * -Math.sin(angle));
 
                 Robot hit = null;
-                float hitT = Float.POSITIVE_INFINITY;
+                float hitT = 1;
                 for(Robot other : robots) {
                     if (other == robot) continue;
                     if (other.power <= 0) continue;
@@ -270,12 +321,19 @@ public class EvolveGame extends Game.Default {
                     }
                 }
                 if (hit != null) {
-                    hit.deltaPower -= 50;
+                    hit.deltaPower -= 100;
                     if (hit.color != robot.color) {
-                        robot.deltaPower += random() * 10;
-                        robot.fitness += 100.0;
+                        if (hit.power + hit.deltaPower <= 0) {
+                            robot.fitness += 200.0;
+                        } else {
+                            robot.fitness += 20.0;
+                        }
                     } else {
-                        robot.fitness -= 1000.0;
+                        if (hit.power + hit.deltaPower <= 0) {
+                            robot.fitness -= 1000.0;
+                        } else {
+                            robot.fitness -= 200.0;
+                        }
                     }
                     x1 = x0 + hitT * (x1 - x0);
                     y1 = y0 + hitT * (y1 - y0);
@@ -305,16 +363,18 @@ public class EvolveGame extends Game.Default {
             updateStep();
             return;
         }
-        for(Ball ball : balls) {
-            ball.applyForces();
-            ball.updatePosition();
-        }
+//        for(Ball ball : balls) {
+//            ball.applyForces();
+//            ball.updatePosition();
+//        }
     }
 
     private Ball getNearestBall(Robot robot) {
         Ball bestBall = null;
+        double fov = robot.getFOV() * Math.PI;
         double bestSquareDistance = Double.POSITIVE_INFINITY;
         for(Ball ball : this.balls) {
+            if (ball.x < -500 || ball.y < -500) continue;
             // check if visible
             double dx = ball.x - robot.x;
             double dy = ball.y - robot.y;
@@ -322,9 +382,9 @@ public class EvolveGame extends Game.Default {
             double ballAngle = Math.atan2(-dy, dx);
             double delta = ballAngle - robot.angle;
 
-            if (Math.abs(delta) < 15 * Math.PI / 180
-                || Math.abs(delta - 2 * Math.PI) < 15 * Math.PI / 180.0
-                || Math.abs(delta + 2 * Math.PI) < 15 * Math.PI / 180.0
+            if (Math.abs(delta) < fov
+                || Math.abs(delta - 2 * Math.PI) < fov
+                || Math.abs(delta + 2 * Math.PI) < fov
                ) {
                 double squareDistance = dx*dx + dy*dy;
                 if (squareDistance < bestSquareDistance) {
@@ -338,10 +398,11 @@ public class EvolveGame extends Game.Default {
 
     private Robot getNearestRobot(Robot robot) {
         Robot bestRobot = null;
+        double fov = robot.getFOV() * Math.PI;
         double bestSquareDistance = Double.POSITIVE_INFINITY;
         for(Robot otherRobot : this.robots) {
             if (otherRobot == robot) continue;
-            if (otherRobot.power <= 0) continue;
+            if (otherRobot.power + otherRobot.deltaPower <= 0) continue;
             // check if visible
             double dx = otherRobot.x - robot.x;
             double dy = otherRobot.y - robot.y;
@@ -349,9 +410,9 @@ public class EvolveGame extends Game.Default {
             double ballAngle = Math.atan2(-dy, dx);
             double delta = ballAngle - robot.angle;
 
-            if (Math.abs(delta) < 15 * Math.PI / 180
-                    || Math.abs(delta - 2 * Math.PI) < 15 * Math.PI / 180.0
-                    || Math.abs(delta + 2 * Math.PI) < 15 * Math.PI / 180.0
+            if (Math.abs(delta) < fov
+                    || Math.abs(delta - 2 * Math.PI) < fov
+                    || Math.abs(delta + 2 * Math.PI) < fov
                     ) {
                 double squareDistance = dx*dx + dy*dy;
                 if (squareDistance < bestSquareDistance) {
@@ -365,14 +426,20 @@ public class EvolveGame extends Game.Default {
 
     private void generationStep() {
         this.generation++;
+        double maxFitness = 0.0;
+        for(Robot robot : robots) {
+            if (robot.fitness < 0.0) robot.fitness = 0;
+            if (robot.fitness > maxFitness) maxFitness = robot.fitness;
+        }
+
         for(Robot robot: robots) {
+            if (maxFitness > 0.0) {
+                robot.fitness = 100 * robot.fitness / maxFitness;
+            }
             if (robot.timeOfDeath < 0) {
-                robot.fitness += 200.0;
+                robot.fitness += 120.0;
             } else {
                 robot.fitness += 100.0 * robot.timeOfDeath / (double) ticksPerGeneration;
-            }
-            if (robot.fitness < 0) {
-                robot.fitness = 0.0;
             }
         }
         for(int i = 0; i < numRobots; i++) {

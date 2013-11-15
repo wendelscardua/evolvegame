@@ -20,19 +20,19 @@ public class Ball implements Position {
     public ImageLayer imageLayer;
 
     public Ball() {
-        this.x = random() * graphics().width();
-        this.y = random() * graphics().height();
         randomize();
     }
 
     public void randomize() {
-        double dx = (random()+.4) * .05 * graphics().width() * (random() > .5 ? 1 : -1);
-        double dy = (random()+.4) * .05 * graphics().height() * (random() > .5 ? 1 : -1);
-        if (this.x + dx <= 0 || this.x + dx > graphics().width()) dx = -dx;
-        if (this.y + dy <= 0 || this.y + dy > graphics().height()) dy = -dy;
-        this.x += dx;
-        this.y += dy;
-        this.speed = 2.0 * random();
+//        double dx = (random()+.4) * .05 * graphics().width() * (random() > .5 ? 1 : -1);
+//        double dy = (random()+.4) * .05 * graphics().height() * (random() > .5 ? 1 : -1);
+//        if (this.x + dx <= 0 || this.x + dx > graphics().width()) dx = -dx;
+//        if (this.y + dy <= 0 || this.y + dy > graphics().height()) dy = -dy;
+//        this.x += dx;
+//        this.y += dy;
+        this.x = random() * graphics().width();
+        this.y = random() * graphics().height();
+        this.speed = random();
         this.angle = random() * 2 * Math.PI;
         double colorFactor = random();
         if (colorFactor < 1/3.0) {
