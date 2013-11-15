@@ -195,12 +195,12 @@ public class EvolveGame extends Game.Default {
             generationStep();
             this.ticks = 0;
         }
-//        for(Ball ball : balls) {
-//            if (random() < 0.002) {
-//                ball.flip();
-//                ball.updatePosition();
-//            }
-//        }
+        for(Ball ball : balls) {
+            if (ball.hidden && random() < 0.002) {
+                ball.flip();
+                ball.updatePosition();
+            }
+        }
         for(Robot robot: this.robots) robot.deltaLife = 0;
         for(Robot robot : this.robots) {
             if (robot.life <= 0) {
@@ -276,20 +276,22 @@ public class EvolveGame extends Game.Default {
             robot.applyForces(leftTrack, rightTrack, speed);
             robot.updatePosition();
             for(Ball ball : this.balls) {
+                if (ball.hidden) continue;
+
                 if (Math.abs(ball.x - robot.x) < 16.0 &&
                     Math.abs(ball.y - robot.y) < 16.0) {
 
                     if (ball.color != robot.color) {
                         robot.color = ball.color;
                         robot.power++;
+                        robot.deltaLife += 50;
                         robot.fitness += 1.0;
                     } else {
                         if (robot.power > 0) robot.power--;
                         robot.fitness += 0.2;
                     }
 
-                    ball.x = -1000;
-                    ball.y = -1000;
+                    ball.hidden = true;
                     ball.updatePosition();
                 }
             }
@@ -311,8 +313,8 @@ public class EvolveGame extends Game.Default {
 
                     float t = (float) (((other.x - x0) * (x1 - x0) + (other.y - y0) * (y1 - y0)) / (laserRange * laserRange));
                     if (t < 0 || t > hitT) continue;
-                    float x2 = x0 + t * (x1 - x0) - other.x();
-                    float y2 = y0 + t * (y1 - y0) - other.y();
+                    float x2 = (float) (x0 + t * (x1 - x0) - other.x);
+                    float y2 = (float) (y0 + t * (y1 - y0) - other.y);
 
                     float distanceEnemyLaser = x2 * x2 + y2 * y2;
 
@@ -322,7 +324,7 @@ public class EvolveGame extends Game.Default {
                     }
                 }
                 if (hit != null) {
-                    hit.deltaLife -= 100;
+                    hit.deltaLife -= 500;
                     x1 = x0 + hitT * (x1 - x0);
                     y1 = y0 + hitT * (y1 - y0);
                 }
@@ -363,7 +365,7 @@ public class EvolveGame extends Game.Default {
         double fov = robot.getFOV() * Math.PI;
         double bestSquareDistance = Double.POSITIVE_INFINITY;
         for(Ball ball : this.balls) {
-            if (ball.x < -500 || ball.y < -500) continue;
+            if (ball.hidden) continue;
             // check if visible
             double dx = ball.x - robot.x;
             double dy = ball.y - robot.y;

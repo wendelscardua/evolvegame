@@ -11,11 +11,10 @@ import static playn.core.PlayN.random;
 * Date: 11/12/13
 * Time: 21:01
 */
-public class Ball implements Position {
+public class Ball {
     public double x;
     public double y;
-    public double speed;
-    public double angle;
+    public boolean hidden = false;
     public Color color;
     public ImageLayer imageLayer;
 
@@ -32,8 +31,7 @@ public class Ball implements Position {
 //        this.y += dy;
         this.x = random() * graphics().width();
         this.y = random() * graphics().height();
-        this.speed = random();
-        this.angle = random() * 2 * Math.PI;
+        this.hidden = false;
         double colorFactor = random();
         if (colorFactor < 1/3.0) {
             color = Color.RED;
@@ -45,6 +43,7 @@ public class Ball implements Position {
     }
 
     public int getTint() {
+        if (this.hidden) return 0xff666666;
         int tint = 0xff000000;
         if (this.color == Color.RED)   tint |= 0x00ff0000;
         if (this.color == Color.GREEN) tint |= 0x0000ff00;
@@ -58,37 +57,15 @@ public class Ball implements Position {
         updatePosition();
     }
 
-    public void applyForces() {
-        double x2 = this.x +  Math.cos(this.angle) * (this.speed);
-        double y2 = this.y + -Math.sin(this.angle) * (this.speed);
-
-        if (x2 < 0) { x2 = 0.0; this.angle = Math.PI - this.angle; }
-        if (x2 > graphics().width()) { x2 = graphics().width(); this.angle = Math.PI - this.angle; }
-        if (y2 < 0) { y2 = 0.0; this.angle = 2 * Math.PI - this.angle; }
-        if (y2 > graphics().height()) { y2 = graphics().height(); this.angle = 2 * Math.PI - this.angle; }
-
-        this.x = x2;
-        this.y = y2;
-        while (this.angle < 0) this.angle += 2 * Math.PI;
-        while (this.angle >= 2 * Math.PI) this.angle -= 2 * Math.PI;
-    }
-
     public void updatePosition() {
         this.imageLayer.setTranslation((float) this.x, (float) this.y);
         this.imageLayer.setTint(this.getTint());
     }
 
-    @Override
-    public float x() {
-        return (float) x;
-    }
-
-    @Override
-    public float y() {
-        return (float) y;
-    }
-
     public void flip() {
+        this.hidden = false;
+        this.x = random() * graphics().width();
+        this.y = random() * graphics().height();
         switch (this.color) {
             case RED:
                 this.color = Color.GREEN;

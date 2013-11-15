@@ -16,7 +16,7 @@ import static playn.core.PlayN.random;
 * Date: 11/12/13
 * Time: 21:01
 */
-public class Robot implements Position {
+public class Robot {
     public final int numInputs = 16;
     public final int numOutputs = 5;
     private final int numHiddenLayers = 3;
@@ -125,13 +125,4 @@ public class Robot implements Position {
         while (this.angle >= 2 * Math.PI) this.angle -= 2 * Math.PI;
     }
 
-    @Override
-    public float x() {
-        return (float) x;
-    }
-
-    @Override
-    public float y() {
-        return (float) y;
-    }
 }
