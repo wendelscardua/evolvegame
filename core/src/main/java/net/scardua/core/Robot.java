@@ -27,16 +27,18 @@ public class Robot implements Position {
     public double speed = 3.0;
 
     public double fitness = 0.0;
-    public final int maxPower = 500;
-    public int power = maxPower;
-    public int deltaPower = 0;
+    public final int maxPower = 10;
+    public int power = 0;
+    public final int maxLife = 500;
+    public int life = maxLife;
+    public int deltaLife = 0;
     public int timeOfDeath = -1;
     public Color color;
 
     public NeuralNetwork brain;
     private ImageLayer imageLayer;
     private double maxTurnRate = .3;
-    private double fov;
+    private double fov = 15 / 180.0;
 
     public Robot() {
         this.brain = new NeuralNetwork(numInputs, numOutputs, numHiddenLayers, numNeuronsPerHiddenLayer);
@@ -54,8 +56,6 @@ public class Robot implements Position {
         double redness = chromosome.getGeneValue("red").getFloatValue();
         double greenness = chromosome.getGeneValue("green").getFloatValue();
         double blueness = chromosome.getGeneValue("blue").getFloatValue();
-        double fov = chromosome.getGeneValue("fov").getFloatValue();
-        this.fov = fov;
         if (redness > greenness && redness > blueness) {
             this.color = Color.RED;
         } else if (greenness > blueness) {
@@ -64,7 +64,8 @@ public class Robot implements Position {
             this.color = Color.BLUE;
         }
         this.fitness = 0.0;
-        this.power = this.maxPower;
+        this.power = 0;
+        this.life = this.maxLife;
         randomize();
     }
 
@@ -76,7 +77,7 @@ public class Robot implements Position {
 
     public int getTint() {
         int tint = 0xff000000;
-        int value = (int) (0x30 + (0xff - 0x30) * this.power / (float) this.maxPower);
+        int value = (int) (0x30 + (0xff - 0x30) * this.life / (float) this.maxLife);
         if (this.color == Color.RED)   tint |= (value << 16);
         if (this.color == Color.GREEN) tint |= (value << 8);
         if (this.color == Color.BLUE)  tint |= value;
@@ -103,19 +104,19 @@ public class Robot implements Position {
         double rotForce = leftTrack - rightTrack;
         if (rotForce >= this.maxTurnRate) { rotForce = this.maxTurnRate; }
         else if (rotForce <= -this.maxTurnRate) { rotForce = -this.maxTurnRate; }
-        this.deltaPower -= 1;
+        this.deltaLife -= 1;
 
 
         this.angle += rotForce;
 
-        double applySpeed = this.speed * 2 * (speed - 0.5); // speed = 1 => 1 (forward). speed = 0 => -1 (rewind)
+        double applySpeed = this.speed * speed;
 
         double x2 = this.x +  Math.cos(this.angle) * (applySpeed);
         double y2 = this.y + -Math.sin(this.angle) * (applySpeed);
 
         if (x2 < 0) { x2 = 0.0; this.angle = Math.PI - this.angle; }
         if (x2 > graphics().width()) { x2 = graphics().width(); this.angle = Math.PI - this.angle; }
-        if (y2 < 0) { y2 = 0.0; this.angle = 2 * Math.PI - this.angle; this.deltaPower -= 10; }
+        if (y2 < 0) { y2 = 0.0; this.angle = 2 * Math.PI - this.angle; this.deltaLife -= 10; }
         if (y2 > graphics().height()) { y2 = graphics().height(); this.angle = 2 * Math.PI - this.angle; }
 
         this.x = x2;

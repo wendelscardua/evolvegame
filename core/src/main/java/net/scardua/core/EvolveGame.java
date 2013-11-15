@@ -4,14 +4,13 @@ import net.scardua.ga.*;
 import playn.core.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import static playn.core.PlayN.*;
 
 public class EvolveGame extends Game.Default {
 
     private ArrayList<Robot> robots = null;
-    private int numRobots = 50;
+    private int numRobots = 20;
     private int numBalls = 50;
     private GeneticAlgorithm ga;
     private int ticks = 0;
@@ -67,7 +66,6 @@ public class EvolveGame extends Game.Default {
                 .addGene("red", FloatValue.class)
                 .addGene("green", FloatValue.class)
                 .addGene("blue", FloatValue.class)
-                .addGene("fov", FloatValue.class)
         ;
 
         int numWeights = this.robots.get(0).brain.getNumWeights();
@@ -77,6 +75,7 @@ public class EvolveGame extends Game.Default {
         }
 
         this.ga = new GeneticAlgorithm(numRobots);
+        this.ga.setEliteChromosomes(numRobots / 2);
         for(int i = 0; i < numRobots; i++) {
             this.robots.get(i).loadChromosome(this.ga.getChromosomes().get(i));
         }
@@ -202,8 +201,9 @@ public class EvolveGame extends Game.Default {
 //                ball.updatePosition();
 //            }
 //        }
+        for(Robot robot: this.robots) robot.deltaLife = 0;
         for(Robot robot : this.robots) {
-            if (robot.power <= 0) {
+            if (robot.life <= 0) {
                 robot.updatePosition();
                 continue;
             }
@@ -213,7 +213,7 @@ public class EvolveGame extends Game.Default {
             int IN_OWN_COLOR_R = 7, IN_OWN_COLOR_G = 8, IN_OWN_COLOR_B = 9;
             int IN_ENEMY_VECTOR_X = 10, IN_ENEMY_VECTOR_Y = 11;
             int IN_ENEMY_R = 12, IN_ENEMY_G = 13, IN_ENEMY_B = 14;
-            int IN_CURRENT_POWER = 15;
+            int IN_CURRENT_LIFE = 15;
             int OUT_LEFT_TRACK = 0, OUT_RIGHT_TRACK = 1, OUT_SPEED = 2, OUT_SHOOTING_IMPETUS = 3, OUT_SHOOTING_RESTRAINT = 4;
             ArrayList<Double> input = new ArrayList<Double>();
             for(int i = 0; i < robot.numInputs; i++) {
@@ -263,7 +263,7 @@ public class EvolveGame extends Game.Default {
                 input.set(IN_ENEMY_G, -1.0);
                 input.set(IN_ENEMY_B, -1.0);
             }
-            input.set(IN_CURRENT_POWER, robot.power / (double) robot.maxPower);
+            input.set(IN_CURRENT_LIFE, robot.life / (double) robot.maxLife);
 
             ArrayList<Double> output = robot.brain.update(input);
 
@@ -273,18 +273,19 @@ public class EvolveGame extends Game.Default {
             double shootingImpetus = output.get(OUT_SHOOTING_IMPETUS);
             double shootingRestraint = output.get(OUT_SHOOTING_RESTRAINT);
 
-            robot.deltaPower = 0;
             robot.applyForces(leftTrack, rightTrack, speed);
             robot.updatePosition();
             for(Ball ball : this.balls) {
                 if (Math.abs(ball.x - robot.x) < 16.0 &&
                     Math.abs(ball.y - robot.y) < 16.0) {
 
-                    robot.deltaPower += 100;
-
                     if (ball.color != robot.color) {
                         robot.color = ball.color;
-                        robot.deltaPower += 50;
+                        robot.power++;
+                        robot.fitness += 1.0;
+                    } else {
+                        if (robot.power > 0) robot.power--;
+                        robot.fitness += 0.2;
                     }
 
                     ball.x = -1000;
@@ -292,9 +293,9 @@ public class EvolveGame extends Game.Default {
                     ball.updatePosition();
                 }
             }
-            if (shootingImpetus > shootingRestraint && robot.power >= 10) {
+            if (shootingImpetus > shootingRestraint && robot.power > 0) {
+                robot.power--;
                 double laserPower = shootingImpetus - shootingRestraint + .1;
-                robot.deltaPower -= 50 * laserPower;
                 float x0 = (float) robot.x;
                 float y0 = (float) robot.y;
                 float laserRange = (float) (Math.sqrt(graphics().width() * graphics().width() + graphics().height() * graphics().height()) * laserPower);
@@ -306,7 +307,7 @@ public class EvolveGame extends Game.Default {
                 float hitT = 1;
                 for(Robot other : robots) {
                     if (other == robot) continue;
-                    if (other.power <= 0) continue;
+                    if (other.life + other.deltaLife <= 0) continue;
 
                     float t = (float) (((other.x - x0) * (x1 - x0) + (other.y - y0) * (y1 - y0)) / (laserRange * laserRange));
                     if (t < 0 || t > hitT) continue;
@@ -321,20 +322,7 @@ public class EvolveGame extends Game.Default {
                     }
                 }
                 if (hit != null) {
-                    hit.deltaPower -= 100;
-                    if (hit.color != robot.color) {
-                        if (hit.power + hit.deltaPower <= 0) {
-                            robot.fitness += 200.0;
-                        } else {
-                            robot.fitness += 20.0;
-                        }
-                    } else {
-                        if (hit.power + hit.deltaPower <= 0) {
-                            robot.fitness -= 1000.0;
-                        } else {
-                            robot.fitness -= 200.0;
-                        }
-                    }
+                    hit.deltaLife -= 100;
                     x1 = x0 + hitT * (x1 - x0);
                     y1 = y0 + hitT * (y1 - y0);
                 }
@@ -347,15 +335,16 @@ public class EvolveGame extends Game.Default {
         boolean stillAlive = false;
 
         for(Robot robot : robots) {
-            robot.power += robot.deltaPower; robot.deltaPower = 0;
-            if (robot.power <= 0) {
-                robot.power = 0;
+            robot.life += robot.deltaLife; robot.deltaLife = 0;
+            if (robot.life <= 0) {
+                robot.life = 0;
                 if (robot.timeOfDeath < 0) {
                     robot.timeOfDeath = ticks;
                 }
             } else {
                 stillAlive = true;
             }
+            if (robot.life > robot.maxLife) robot.life = robot.maxLife;
             if (robot.power > robot.maxPower) robot.power = robot.maxPower;
         }
         if (!stillAlive) {
@@ -402,7 +391,7 @@ public class EvolveGame extends Game.Default {
         double bestSquareDistance = Double.POSITIVE_INFINITY;
         for(Robot otherRobot : this.robots) {
             if (otherRobot == robot) continue;
-            if (otherRobot.power + otherRobot.deltaPower <= 0) continue;
+            if (otherRobot.life + otherRobot.deltaLife <= 0) continue;
             // check if visible
             double dx = otherRobot.x - robot.x;
             double dy = otherRobot.y - robot.y;
@@ -431,15 +420,13 @@ public class EvolveGame extends Game.Default {
             if (robot.fitness < 0.0) robot.fitness = 0;
             if (robot.fitness > maxFitness) maxFitness = robot.fitness;
         }
-
+        int longestLife = 1;
+        for(Robot robot: robots) {
+            if (robot.timeOfDeath > longestLife) longestLife = robot.timeOfDeath;
+        }
         for(Robot robot: robots) {
             if (maxFitness > 0.0) {
                 robot.fitness = 100 * robot.fitness / maxFitness;
-            }
-            if (robot.timeOfDeath < 0) {
-                robot.fitness += 120.0;
-            } else {
-                robot.fitness += 100.0 * robot.timeOfDeath / (double) ticksPerGeneration;
             }
         }
         for(int i = 0; i < numRobots; i++) {
